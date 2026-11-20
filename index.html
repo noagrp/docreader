@@ -63,7 +63,7 @@ let current=null, workbook=null, sheetName='', url=null, searchTimer=null;
 const maxSize=30*1024*1024, maxRows=2000, maxCols=100;
 const supported=new Set(['txt','log','md','markdown','json','csv','tsv','docx','xlsx','xls','ods','pdf']);
 function setStatus(message,level=''){status.textContent=message;status.className='status '+level}
-function clearView(){if(url){URL.revokeObjectURL(url);url=null}current=null;workbook=null;sheetName='';content.replaceChildren();tabs.replaceChildren();viewer.classList.add('hidden');workspace.classList.add('hidden');fileInput.value='';$('search').value='';$('pdf').disabled=false;setStatus('Ready. Files are processed on your device.')}
+function clearView(){if(url){URL.revokeObjectURL(url);url=null}current=null;workbook=null;sheetName='';content.replaceChildren();tabs.replaceChildren();viewer.classList.add('hidden');workspace.classList.add('hidden');fileInput.value='';$('search').value='';$('search').disabled=false;content.style.fontSize='';$('pdf').disabled=false;setStatus('Ready. Files are processed on your device.')}
 function textNode(text){const p=document.createElement('pre');p.className='rawtext';p.textContent=text;return p}
 function setContent(node){content.replaceChildren(node);viewer.classList.remove('hidden');content.scrollTop=0;content.scrollLeft=0}
 function displayText(text,kind){if(kind==='json'){try{text=JSON.stringify(JSON.parse(text),null,2)}catch(e){setStatus('This is not valid JSON. Showing original text.','warn')}}else if(kind==='md'||kind==='markdown'){/* show source faithfully, not unsafe interpreted markup */}setContent(textNode(text))}
