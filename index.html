@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TXT to PDF</title>
+    
+    <script src="mammoth.browser.min.js"></script>
+    <script src="html2pdf.bundle.min.js"></script>
+
+    <style>
+        /* Responsive design with zero horizontal padding */
+        body { 
+            font-family: monospace; 
+            background: #fff; 
+            color: #000; 
+            padding: 20px 7px; /* No left/right padding on body */
+            margin: 0;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            line-height: 1.5; 
+        }
+        
+        .app-box { 
+            width: 100%; 
+            max-width: 600px; 
+            padding: 25px 0; /* Removed left/right padding */
+        }
+
+        h1 { 
+            font-size: 1.3rem; 
+            text-transform: uppercase; 
+            padding-bottom: 10px; 
+            margin: 0 10px 20px 10px; /* Small margin for text breathing room */
+            border-bottom: 2px solid #000; 
+        }
+
+        input[type="file"] { 
+            width: calc(100% - 20px); /* Adjusting for margin */
+            margin: 0 10px 20px 10px;
+            padding: 12px 0; 
+            border: 1px solid #000;
+        }
+        
+        #display-box { 
+            width: 100%; 
+            padding: 20px 0; /* Removed left/right padding */
+            margin: 20px 0; 
+            display: none; 
+            text-align: left; 
+            background: #fff; 
+            min-height: 200px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        button { 
+            width: calc(100% - 20px);
+            margin: 0 10px;
+            padding: 15px 0; 
+            background: #000; 
+            color: #fff; 
+            border: none; 
+            font-weight: bold; 
+            cursor: pointer; 
+            text-transform: uppercase; 
+        }
+
+        button:disabled { 
+            background: #ccc; 
+            cursor: not-allowed; 
+        }
+
+        #status-msg { 
+            background: #f0f0f0; 
+            padding: 10px 0; /* Removed left/right padding */
+            margin: 15px 10px 0 10px; 
+            border-left: 5px solid #000; 
+            font-size: 12px; 
+            width: calc(100% - 20px); 
+        }
+
+        footer { 
+            margin-top: 50px; 
+            width: 100%;
+            max-width: 600px; 
+            text-align: justify; 
+            font-size: 13px; 
+            border-top: 1px solid #000; 
+            padding: 20px 10px; /* Minimal padding for readability on footer text */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-box">
+        <h1>TXT to PDF</h1>
+        <input type="file" id="file-input" accept=".docx, .txt, .log, .md, .json, .csv">
+        
+        <div id="display-box"></div>
+
+        <button id="action-btn" disabled>Generate PDF</button>
+        <div id="status-msg">> SYSTEM_READY</div>
+    </div>
+
+    <footer>
+        <strong>SUPPORTED FORMATS:</strong> .txt, .log, .md, .json, .csv
+        <br><br>
+        <strong>HOW TO USE:</strong> Select any supported file. The tool acts as a <strong>Simple Reader</strong>. Once the content is visible, click "Generate PDF" to export a high-fidelity visual snapshot. This is a browser-based simple reader-generator. All files are processed locally on your device, ensuring your data never leaves your browser and remains 100% private.
+    </footer>
+
+    
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const displayBox = document.getElementById('display-box');
+        const actionBtn = document.getElementById('action-btn');
+        const statusMsg = document.getElementById('status-msg');
+
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const ext = file.name.split('.').pop().toLowerCase();
+            statusMsg.innerText = "> LOADING_READER...";
+            const reader = new FileReader();
+
+            reader.onload = async (event) => {
+                try {
+                    if (ext === "docx") {
+                        const result = await mammoth.convertToHtml({ arrayBuffer: event.target.result });
+                        displayBox.innerHTML = result.value;
+                    } else {
+                        const text = new TextDecoder().decode(event.target.result);
+                        displayBox.innerText = text;
+                    }
+                    
+                    displayBox.style.display = "block";
+                    statusMsg.innerText = "> READY: " + file.name.toUpperCase();
+                    actionBtn.disabled = false;
+                } catch (err) {
+                    statusMsg.innerText = "> ERROR: FILE_UNREADABLE";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        actionBtn.onclick = async () => {
+            const file = fileInput.files[0];
+            actionBtn.disabled = true;
+            statusMsg.innerText = "> EXECUTING_FULL_EXPORT...";
+
+            const options = {
+                margin: 0.5,
+                filename: file.name.replace(/\.[^/.]+$/, "") + ".pdf",
+                html2canvas: { 
+                    scale: 2, 
+                    scrollY: 0, 
+                    useCORS: true,
+                    windowHeight: displayBox.scrollHeight 
+                },
+                jsPDF: { unit: 'in', format: 'letter', compress: true },
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            setTimeout(async () => {
+                try {
+                    await html2pdf().set(options).from(displayBox).save();
+                    statusMsg.innerText = "> DOWNLOAD_COMPLETE.";
+                } catch (err) {
+                    statusMsg.innerText = "> ERROR: EXPORT_CRASHED";
+                }
+                actionBtn.disabled = false;
+            }, 1000);
+        };
+    </script>
+</body>
+</html>
+
+
