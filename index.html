@@ -1,181 +1,82 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TXT to PDF</title>
-    
-    <script src="mammoth.browser.min.js"></script>
-    <script src="html2pdf.bundle.min.js"></script>
-
-    <style>
-        /* Responsive design with zero horizontal padding */
-        body { 
-            font-family: monospace; 
-            background: #fff; 
-            color: #000; 
-            padding: 20px 7px; /* No left/right padding on body */
-            margin: 0;
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            line-height: 1.5; 
-        }
-        
-        .app-box { 
-            width: 100%; 
-            max-width: 600px; 
-            padding: 25px 0; /* Removed left/right padding */
-        }
-
-        h1 { 
-            font-size: 1.3rem; 
-            text-transform: uppercase; 
-            padding-bottom: 10px; 
-            margin: 0 10px 20px 10px; /* Small margin for text breathing room */
-            border-bottom: 2px solid #000; 
-        }
-
-        input[type="file"] { 
-            width: calc(100% - 20px); /* Adjusting for margin */
-            margin: 0 10px 20px 10px;
-            padding: 12px 0; 
-            border: 1px solid #000;
-        }
-        
-        #display-box { 
-            width: 100%; 
-            padding: 20px 0; /* Removed left/right padding */
-            margin: 20px 0; 
-            display: none; 
-            text-align: left; 
-            background: #fff; 
-            min-height: 200px;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-
-        button { 
-            width: calc(100% - 20px);
-            margin: 0 10px;
-            padding: 15px 0; 
-            background: #000; 
-            color: #fff; 
-            border: none; 
-            font-weight: bold; 
-            cursor: pointer; 
-            text-transform: uppercase; 
-        }
-
-        button:disabled { 
-            background: #ccc; 
-            cursor: not-allowed; 
-        }
-
-        #status-msg { 
-            background: #f0f0f0; 
-            padding: 10px 0; /* Removed left/right padding */
-            margin: 15px 10px 0 10px; 
-            border-left: 5px solid #000; 
-            font-size: 12px; 
-            width: calc(100% - 20px); 
-        }
-
-        footer { 
-            margin-top: 50px; 
-            width: 100%;
-            max-width: 600px; 
-            text-align: justify; 
-            font-size: 13px; 
-            border-top: 1px solid #000; 
-            padding: 20px 10px; /* Minimal padding for readability on footer text */
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>DocReader — Local Document Reader & PDF Export</title>
+<script src="mammoth.browser.min.js"></script>
+<script src="html2pdf.bundle.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+<style>
+:root{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17212f;background:#f5f7fb;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}.shell{max-width:1120px;margin:auto;padding:24px 18px 55px}
+header{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:22px;flex-wrap:wrap}h1{font-size:1.75rem;letter-spacing:-.04em;margin:0}.tagline{font-size:.91rem;color:#64748b;margin:4px 0 0}.chip{border:1px solid #cbd5e1;background:white;color:#475569;border-radius:99px;padding:7px 12px;font-size:.75rem}
+.panel{background:white;border:1px solid #dfe5ee;border-radius:15px;box-shadow:0 2px 12px #1e293b08}.upload{padding:25px;text-align:center;border:2px dashed #aebed1;background:#fff;cursor:pointer;outline-offset:3px}.upload.drag{background:#eff6ff;border-color:#2563eb}.upload b{display:block;font-size:1.1rem}.upload p{font-size:.88rem;color:#64748b;margin:7px 0 13px}.upload input{display:none}
+button,.pick{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:38px;padding:9px 14px;border-radius:8px;border:1px solid #cbd5e1;background:white;color:#17212f;font:inherit;font-size:.88rem;cursor:pointer}button:hover,.pick:hover{background:#f1f5f9}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#17212f;border-color:#17212f;color:white}.primary:hover{background:#334155}.pick{background:#17212f;border-color:#17212f;color:white}.pick:hover{background:#334155}.formats{font-size:.76rem;color:#64748b;margin-top:10px}
+.toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:15px;margin-top:16px}.filename{font-weight:700;overflow-wrap:anywhere;flex:1;min-width:170px}.meta{font-weight:400;font-size:.76rem;color:#64748b;display:block;margin-top:3px}.search{width:175px;max-width:100%;min-height:38px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font:inherit;font-size:.88rem}.settings{padding:0 15px 15px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}.settings label{font-size:.79rem;color:#475569;display:flex;align-items:center;gap:7px}select{padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;background:white;color:#17212f;font:inherit;font-size:.85rem}
+.status{font-size:.84rem;margin:14px 0;color:#475569;min-height:22px}.status.error{color:#b42318}.status.warn{color:#9a6700}
+.viewer{overflow:hidden;margin-top:8px}.viewerbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 17px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:.83rem;color:#475569}.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button{font-size:.78rem;min-height:30px;padding:5px 10px}.tabs button.active{color:white;background:#17212f;border-color:#17212f}
+.paper{padding:26px 30px;min-height:280px;overflow:auto;line-height:1.65;overflow-wrap:anywhere;max-height:75vh}.paper h1,.paper h2,.paper h3{letter-spacing:normal}.paper img{max-width:100%;height:auto}.paper table{border-collapse:collapse;max-width:100%}.paper th,.paper td{border:1px solid #d1d5db;padding:6px 9px;vertical-align:top}.paper pre,.rawtext{white-space:pre-wrap;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.87rem;line-height:1.55;margin:0}.paper pre{background:#f8fafc;padding:14px;border-radius:8px}.sheetwrap{overflow:auto;max-width:100%;max-height:68vh}.sheet{font:13px system-ui,sans-serif;white-space:nowrap;border-collapse:collapse;width:max-content;min-width:100%}.sheet th,.sheet td{padding:5px 9px;border:1px solid #dce2ea;min-width:60px;max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:pre-wrap}.sheet thead th{position:sticky;top:0;background:#e9eef5;z-index:2}.sheet tbody th{position:sticky;left:0;background:#f4f6fa;z-index:1;min-width:40px}.sheet tbody tr:nth-child(even){background:#fafbfc}.note{font-size:.78rem;color:#64748b;margin-top:12px}.hidden{display:none!important}
+.pdfview{width:100%;height:72vh;min-height:430px;border:0;background:#fff}
+mark{background:#ffe59c;color:inherit;border-radius:2px}
+footer{font-size:.79rem;color:#64748b;margin-top:20px;text-align:center}
+@media(max-width:620px){.shell{padding:16px 9px 35px}.paper{padding:15px 12px;max-height:68vh}.toolbar{padding:12px}.search{width:100%}.toolbar .filename{flex-basis:100%}.settings{gap:9px}.upload{padding:22px 10px}.pdfview{height:65vh}}
+@media print{body{background:white}.shell{max-width:none;padding:0}header,.upload,.toolbar,.settings,.status,.viewerbar,footer{display:none!important}.viewer{border:0;box-shadow:none}.paper{overflow:visible;max-height:none;padding:0}.sheetwrap{overflow:visible;max-height:none}.sheet thead th,.sheet tbody th{position:static} }
+</style>
 </head>
 <body>
-
-    <div class="app-box">
-        <h1>TXT to PDF</h1>
-        <input type="file" id="file-input" accept=".docx, .txt, .log, .md, .json, .csv">
-        
-        <div id="display-box"></div>
-
-        <button id="action-btn" disabled>Generate PDF</button>
-        <div id="status-msg">> SYSTEM_READY</div>
-    </div>
-
-    <footer>
-        <strong>SUPPORTED FORMATS:</strong> .txt, .log, .md, .json, .csv
-        <br><br>
-        <strong>HOW TO USE:</strong> Select any supported file. The tool acts as a <strong>Simple Reader</strong>. Once the content is visible, click "Generate PDF" to export a high-fidelity visual snapshot. This is a browser-based simple reader-generator. All files are processed locally on your device, ensuring your data never leaves your browser and remains 100% private.
-    </footer>
-
-    
-
-    <script>
-        const fileInput = document.getElementById('file-input');
-        const displayBox = document.getElementById('display-box');
-        const actionBtn = document.getElementById('action-btn');
-        const statusMsg = document.getElementById('status-msg');
-
-        fileInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const ext = file.name.split('.').pop().toLowerCase();
-            statusMsg.innerText = "> LOADING_READER...";
-            const reader = new FileReader();
-
-            reader.onload = async (event) => {
-                try {
-                    if (ext === "docx") {
-                        const result = await mammoth.convertToHtml({ arrayBuffer: event.target.result });
-                        displayBox.innerHTML = result.value;
-                    } else {
-                        const text = new TextDecoder().decode(event.target.result);
-                        displayBox.innerText = text;
-                    }
-                    
-                    displayBox.style.display = "block";
-                    statusMsg.innerText = "> READY: " + file.name.toUpperCase();
-                    actionBtn.disabled = false;
-                } catch (err) {
-                    statusMsg.innerText = "> ERROR: FILE_UNREADABLE";
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        };
-
-        actionBtn.onclick = async () => {
-            const file = fileInput.files[0];
-            actionBtn.disabled = true;
-            statusMsg.innerText = "> EXECUTING_FULL_EXPORT...";
-
-            const options = {
-                margin: 0.5,
-                filename: file.name.replace(/\.[^/.]+$/, "") + ".pdf",
-                html2canvas: { 
-                    scale: 2, 
-                    scrollY: 0, 
-                    useCORS: true,
-                    windowHeight: displayBox.scrollHeight 
-                },
-                jsPDF: { unit: 'in', format: 'letter', compress: true },
-                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-            };
-
-            setTimeout(async () => {
-                try {
-                    await html2pdf().set(options).from(displayBox).save();
-                    statusMsg.innerText = "> DOWNLOAD_COMPLETE.";
-                } catch (err) {
-                    statusMsg.innerText = "> ERROR: EXPORT_CRASHED";
-                }
-                actionBtn.disabled = false;
-            }, 1000);
-        };
-    </script>
+<div class="shell">
+<header><div><h1>DocReader</h1><p class="tagline">Read documents and spreadsheets. Export PDF when needed.</p></div><span class="chip">Local file processing · No account</span></header>
+<label class="upload panel" id="dropzone" tabindex="0" role="button">
+<b>Open a document</b><p>Choose a file or drag and drop it here</p>
+<span class="pick">Choose file</span>
+<input id="file" type="file" accept=".txt,.log,.md,.markdown,.json,.csv,.tsv,.docx,.xlsx,.xls,.ods,.pdf,text/plain,application/pdf">
+<div class="formats">TXT · LOG · MD · JSON · CSV · TSV · DOCX · XLSX · XLS · ODS · PDF</div>
+</label>
+<section id="workspace" class="hidden">
+<div class="toolbar panel">
+<div class="filename" id="filename"></div>
+<input id="search" class="search" type="search" placeholder="Search document" aria-label="Search document">
+<button id="clear" type="button">Clear</button>
+<button id="pdf" type="button" class="primary">Export PDF</button>
+</div>
+<div class="settings panel" style="margin-top:8px">
+<label>Paper <select id="size"><option value="a4">A4</option><option value="letter">US Letter</option><option value="a5">A5</option></select></label>
+<label>Orientation <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+<label>Text size <select id="font"><option value="12">Small</option><option value="14" selected>Normal</option><option value="16">Large</option><option value="18">Extra large</option></select></label>
+</div>
+</section>
+<div class="status" id="status" role="status" aria-live="polite">Ready. Files are processed on your device.</div>
+<section id="viewer" class="viewer panel hidden">
+<div class="viewerbar"><span id="doctype">Document preview</span><div id="tabs" class="tabs"></div></div>
+<div id="content" class="paper"></div>
+</section>
+<footer>DocReader is a read-only local browser viewer. Complex Word and Excel formatting may differ from Microsoft Office. PDF export captures the rendered preview and may not create selectable text. External libraries require an internet connection to load.</footer>
+</div>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const fileInput=$('file'), content=$('content'), status=$('status'), workspace=$('workspace'), viewer=$('viewer'), tabs=$('tabs');
+let current=null, workbook=null, sheetName='', url=null, searchTimer=null;
+const maxSize=30*1024*1024, maxRows=2000, maxCols=100;
+const supported=new Set(['txt','log','md','markdown','json','csv','tsv','docx','xlsx','xls','ods','pdf']);
+function setStatus(message,level=''){status.textContent=message;status.className='status '+level}
+function clearView(){if(url){URL.revokeObjectURL(url);url=null}current=null;workbook=null;sheetName='';content.replaceChildren();tabs.replaceChildren();viewer.classList.add('hidden');workspace.classList.add('hidden');fileInput.value='';$('search').value='';$('pdf').disabled=false;setStatus('Ready. Files are processed on your device.')}
+function textNode(text){const p=document.createElement('pre');p.className='rawtext';p.textContent=text;return p}
+function setContent(node){content.replaceChildren(node);viewer.classList.remove('hidden');content.scrollTop=0;content.scrollLeft=0}
+function displayText(text,kind){if(kind==='json'){try{text=JSON.stringify(JSON.parse(text),null,2)}catch(e){setStatus('This is not valid JSON. Showing original text.','warn')}}else if(kind==='md'||kind==='markdown'){/* show source faithfully, not unsafe interpreted markup */}setContent(textNode(text))}
+function decode(buffer){const bytes=new Uint8Array(buffer);if(bytes[0]===0xff&&bytes[1]===0xfe)return new TextDecoder('utf-16le').decode(bytes);if(bytes[0]===0xfe&&bytes[1]===0xff)return new TextDecoder('utf-16be').decode(bytes);return new TextDecoder('utf-8').decode(bytes)}
+function renderDelimited(buffer,sep){const text=decode(buffer);const rows=[];let row=[],field='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===sep&&!quoted){row.push(field);field=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(field);rows.push(row);row=[];field='';if(rows.length>maxRows)break}else field+=ch}if(field||row.length){row.push(field);rows.push(row)}const clipped=rows.length>maxRows||rows.some(r=>r.length>maxCols);setContent(makeTable(rows.slice(0,maxRows),false));if(clipped)setStatus('Preview limited to '+maxRows+' rows and '+maxCols+' columns; export includes the visible preview only.','warn')}
+function columnName(i){let name='';for(i++;i;i=Math.floor((i-1)/26))name=String.fromCharCode(65+(i-1)%26)+name;return name}
+function makeTable(rows,showHeaders){const wrap=document.createElement('div');wrap.className='sheetwrap';const table=document.createElement('table');table.className='sheet';const cols=Math.min(maxCols,Math.max(0,...rows.map(r=>r.length)));if(showHeaders){const thead=document.createElement('thead');const tr=document.createElement('tr');const blank=document.createElement('th');tr.append(blank);for(let c=0;c<cols;c++){const th=document.createElement('th');th.textContent=columnName(c);tr.append(th)}thead.append(tr);table.append(thead)}const tbody=document.createElement('tbody');for(let r=0;r<rows.length;r++){const tr=document.createElement('tr');if(showHeaders){const th=document.createElement('th');th.textContent=String(r+1);tr.append(th)}for(let c=0;c<cols;c++){const td=document.createElement('td');td.textContent=String(rows[r]?.[c]??'');tr.append(td)}tbody.append(tr)}table.append(tbody);wrap.append(table);return wrap}
+function renderSheet(name){sheetName=name;tabs.replaceChildren();for(const label of workbook.SheetNames){const button=document.createElement('button');button.type='button';button.textContent=label;button.className=label===name?'active':'';button.addEventListener('click',()=>{renderSheet(label);runSearch()});tabs.append(button)}const sheet=workbook.Sheets[name],range=window.XLSX.utils.decode_range(sheet['!ref']||'A1');const endRow=Math.min(range.e.r,range.s.r+maxRows-1),endCol=Math.min(range.e.c,range.s.c+maxCols-1);const rows=[];for(let r=range.s.r;r<=endRow;r++){const row=[];for(let c=range.s.c;c<=endCol;c++){const cell=sheet[XLSX.utils.encode_cell({r,c})];row.push(cell?String(cell.w??cell.v??''):'')}rows.push(row)}setContent(makeTable(rows,true));$('doctype').textContent='Spreadsheet · '+name;if(range.e.r>endRow||range.e.c>endCol)setStatus('Large worksheet: preview limited to '+maxRows+' rows and '+maxCols+' columns from the used range. PDF exports the visible sheet only.','warn');else setStatus('Viewing worksheet: '+name)}
+function runSearch(){const q=$('search').value.trim().toLocaleLowerCase();const scope=content;if(!current||current.ext==='pdf')return;for(const mark of [...scope.querySelectorAll('mark')])mark.replaceWith(document.createTextNode(mark.textContent));scope.normalize();if(!q)return;const walker=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(walker.currentNode.parentElement&& !['SCRIPT','STYLE'].includes(walker.currentNode.parentElement.tagName))nodes.push(walker.currentNode);let found=0;for(const node of nodes){const text=node.nodeValue,lower=text.toLocaleLowerCase();if(!lower.includes(q))continue;const frag=document.createDocumentFragment();let from=0,at;while((at=lower.indexOf(q,from))>=0){frag.append(document.createTextNode(text.slice(from,at)));const mark=document.createElement('mark');mark.textContent=text.slice(at,at+q.length);frag.append(mark);from=at+q.length;found++;if(found>2000)break}frag.append(document.createTextNode(text.slice(from)));node.replaceWith(frag);if(found>2000)break}setStatus(found+' match'+(found===1?'':'es')+(found>2000?' (limit reached)':''));}
+async function openFile(file){clearView();if(!file)return;const ext=(file.name.split('.').pop()||'').toLowerCase();if(!supported.has(ext))return setStatus('Unsupported file format. Choose a file from the listed formats.','error');if(file.size>maxSize)return setStatus('File exceeds the 30 MB safety limit.','error');current={file,ext};workspace.classList.remove('hidden');$('filename').textContent=file.name;const meta=document.createElement('span');meta.className='meta';meta.textContent=(file.size/1024).toFixed(1)+' KB · '+ext.toUpperCase();$('filename').append(meta);$('doctype').textContent=ext.toUpperCase()+' reader';setStatus('Opening '+file.name+'…');try{const buffer=await file.arrayBuffer();if(ext==='docx'){if(typeof mammoth==='undefined'||typeof DOMPurify==='undefined')throw Error('Word reader or HTML sanitizer failed to load');const result=await mammoth.convertToHtml({arrayBuffer:buffer});const doc=document.createElement('div');doc.innerHTML=DOMPurify.sanitize(result.value,{USE_PROFILES:{html:true}});setContent(doc);if(result.messages.length)setStatus('Opened Word document. Some unsupported formatting may differ.','warn');else setStatus('Word document ready.')}else if(['xlsx','xls','ods'].includes(ext)){if(!window.XLSX)throw Error('Spreadsheet reader unavailable. Check internet connection.');workbook=XLSX.read(buffer,{type:'array',cellDates:true});if(!workbook.SheetNames.length)throw Error('No worksheets found');renderSheet(workbook.SheetNames[0])}else if(ext==='csv'||ext==='tsv'){renderDelimited(buffer,ext==='tsv'?'\t':',');$('doctype').textContent='Delimited table'}else if(ext==='pdf'){url=URL.createObjectURL(file);const iframe=document.createElement('iframe');iframe.className='pdfview';iframe.title='PDF preview';iframe.src=url;setContent(iframe);$('search').disabled=true;setStatus('PDF opened in the browser viewer. Export downloads the original PDF unchanged.')}else{displayText(decode(buffer),ext);setStatus('Document ready.')} }catch(err){console.error(err);content.replaceChildren();viewer.classList.add('hidden');$('pdf').disabled=true;setStatus('Unable to read file: '+(err.message||'Invalid or unsupported content'),'error')}}
+async function exportPdf(){if(!current)return;const {file,ext}=current;if(ext==='pdf'){const a=document.createElement('a');a.href=url;a.download=file.name;document.body.append(a);a.click();a.remove();setStatus('Original PDF downloaded without modification.');return}const button=$('pdf');button.disabled=true;setStatus('Generating PDF from the visible preview…');try{if(typeof html2pdf==='undefined')throw Error('PDF export library missing');const outputName=file.name.replace(/\.[^.]+$/,'')+'.pdf';const settings={margin:0.45,filename:outputName,image:{type:'jpeg',quality:0.98},html2canvas:{scale:1.6,scrollY:0,useCORS:true},jsPDF:{unit:'in',format:$('size').value,orientation:$('orientation').value,compress:true},pagebreak:{mode:['css','legacy']}};const clone=content.cloneNode(true);clone.style.maxHeight='none';clone.style.overflow='visible';clone.style.width='auto';clone.style.fontSize=$('font').value+'px';for(const mark of clone.querySelectorAll('mark'))mark.replaceWith(document.createTextNode(mark.textContent));for(const el of clone.querySelectorAll('.sheetwrap')){el.style.maxHeight='none';el.style.overflow='visible'}for(const el of clone.querySelectorAll('.sheet thead th,.sheet tbody th'))el.style.position='static';const holder=document.createElement('div');holder.style.cssText='position:fixed;left:-100000px;top:0;background:white;padding:12px;z-index:-1';holder.style.width=$('orientation').value==='landscape'?'950px':'690px';holder.append(clone);document.body.append(holder);try{await html2pdf().set(settings).from(clone).save()}finally{holder.remove()}setStatus('PDF export complete.')}catch(err){console.error(err);setStatus('PDF export failed: '+(err.message||'unknown error'),'error')}finally{button.disabled=false}}
+fileInput.addEventListener('change',e=>openFile(e.target.files?.[0]));$('clear').addEventListener('click',clearView);$('pdf').addEventListener('click',exportPdf);$('search').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(runSearch,250)});$('font').addEventListener('change',()=>content.style.fontSize=$('font').value+'px');
+const dz=$('dropzone');dz.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();fileInput.click()}});dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag')});dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');openFile(e.dataTransfer.files?.[0])});
+</script>
 </body>
 </html>
-
-
