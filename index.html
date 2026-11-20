@@ -58,7 +58,7 @@ footer{font-size:.79rem;color:#64748b;margin-top:20px;text-align:center}
 <details class="export-options panel" style="margin-top:8px"><summary>Optional PDF export settings</summary><div class="settings">
 <label>Paper <select id="size"><option value="a4">A4</option><option value="a3">A3</option><option value="letter">US Letter</option><option value="a5">A5</option></select></label>
 <label>Orientation <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
-<label>Fit <select id="fit"><option value="width">Fit to page width</option><option value="actual">Actual width</option></select></label><label>Margins <select id="margin"><option value="0.3">Narrow</option><option value="0.45" selected>Normal</option><option value="0.7">Wide</option></select></label><label><input type="checkbox" id="repeat-header" checked> Repeat table header</label><label>Text size <select id="font"><option value="12">Small</option><option value="14" selected>Normal</option><option value="16">Large</option><option value="18">Extra large</option></select></label>
+<label>Fit <select id="fit"><option value="split">Split wide tables (readable)</option><option value="width">Fit all columns on one page</option></select></label><label>Margins <select id="margin"><option value="0.3">Narrow</option><option value="0.45" selected>Normal</option><option value="0.7">Wide</option></select></label><label><input type="checkbox" id="repeat-header"> Use first row as repeating header</label><label>Text size <select id="font"><option value="12">Small</option><option value="14" selected>Normal</option><option value="16">Large</option><option value="18">Extra large</option></select></label>
 </div></details>
 </section>
 <div class="status" id="status" role="status" aria-live="polite">Ready. Files are processed on your device.</div>
@@ -66,23 +66,39 @@ footer{font-size:.79rem;color:#64748b;margin-top:20px;text-align:center}
 <div class="viewerbar"><span id="doctype">Document preview</span><div id="tabs" class="tabs"></div></div>
 <div id="content" class="paper"></div>
 </section>
-<section id="pdfPreview" class="panel hidden"><div class="preview-head"><strong>Generated PDF preview</strong><button id="close-preview" type="button">Close preview</button></div><iframe id="pdf-preview-frame" title="PDF preview"></iframe><p class="note">Review all PDF pages before saving. Use A3 or landscape for very wide tables.</p></section>
+<section id="pdfPreview" class="panel hidden"><div class="preview-head"><strong>Generated PDF preview</strong><button id="close-preview" type="button">Close preview</button></div><iframe id="pdf-preview-frame" title="PDF preview"></iframe><p class="note">Review PDF pages before saving. For wide tables, choose A3 landscape or split columns into readable sections.</p></section>
 <footer>DocReader prioritizes viewing and searching. PDF export is an optional convenience. It is a read-only local browser viewer. Complex Word and Excel formatting may differ from Microsoft Office. PDF export captures the rendered preview and may not create selectable text. External libraries require an internet connection to load.</footer>
 </div>
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
 const fileInput=$('file'), content=$('content'), status=$('status'), workspace=$('workspace'), viewer=$('viewer'), tabs=$('tabs');
-let current=null, workbook=null, sheetName='', url=null, searchTimer=null, previewUrl=null, previewPdf=null, columnWidths=[], activeSheetRows=null;
+let current=null, workbook=null, sheetName='', url=null, searchTimer=null, previewUrl=null, previewPdf=null, columnWidths=[], activeSheetRows=null, loadVersion=0;
 const maxSize=30*1024*1024, maxRows=2000, maxCols=100;
 const supported=new Set(['txt','log','md','markdown','json','csv','tsv','docx','xlsx','xls','ods','pdf']);
 function setStatus(message,level=''){status.textContent=message;status.className='status '+level}
-function clearView(){closePdfPreview();columnWidths=[];activeSheetRows=null;$('sheet-layout').classList.add('hidden');if(url){URL.revokeObjectURL(url);url=null}current=null;workbook=null;sheetName='';content.replaceChildren();tabs.replaceChildren();viewer.classList.add('hidden');workspace.classList.add('hidden');fileInput.value='';$('search').value='';$('search').disabled=false;content.style.fontSize='';$('pdf').disabled=false;setStatus('Ready. Files are processed on your device.')}
+function clearView(){loadVersion++;clearTimeout(searchTimer);$('preview-pdf').disabled=false;closePdfPreview();columnWidths=[];activeSheetRows=null;$('sheet-layout').classList.add('hidden');if(url){URL.revokeObjectURL(url);url=null}current=null;workbook=null;sheetName='';content.replaceChildren();tabs.replaceChildren();viewer.classList.add('hidden');workspace.classList.add('hidden');fileInput.value='';$('search').value='';$('search').disabled=false;content.style.fontSize='';$('pdf').disabled=true;$('preview-pdf').disabled=true;setStatus('Ready. Files are processed on your device.')}
 function textNode(text){const p=document.createElement('pre');p.className='rawtext';p.textContent=text;return p}
 function setContent(node){closePdfPreview();content.replaceChildren(node);viewer.classList.remove('hidden');content.scrollTop=0;content.scrollLeft=0}
 function displayText(text,kind){if(kind==='json'){try{text=JSON.stringify(JSON.parse(text),null,2)}catch(e){setStatus('This is not valid JSON. Showing original text.','warn')}}else if(kind==='md'||kind==='markdown'){/* show source faithfully, not unsafe interpreted markup */}setContent(textNode(text))}
 function decode(buffer){const bytes=new Uint8Array(buffer);if(bytes[0]===0xff&&bytes[1]===0xfe)return new TextDecoder('utf-16le').decode(bytes);if(bytes[0]===0xfe&&bytes[1]===0xff)return new TextDecoder('utf-16be').decode(bytes);return new TextDecoder('utf-8').decode(bytes)}
-function renderDelimited(buffer,sep){const text=decode(buffer);const rows=[];let row=[],field='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else quoted=!quoted}else if(ch===sep&&!quoted){row.push(field);field=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(field);rows.push(row);row=[];field='';if(rows.length>maxRows)break}else field+=ch}if(field||row.length){row.push(field);rows.push(row)}const clipped=rows.length>maxRows||rows.some(r=>r.length>maxCols);setContent(makeTable(rows.slice(0,maxRows),false));if(clipped)setStatus('Preview limited to '+maxRows+' rows and '+maxCols+' columns; export includes the visible preview only.','warn')}
+function renderDelimited(buffer,sep){
+ const text=decode(buffer),rows=[];let row=[],field='',quoted=false,clipped=false;
+ for(let i=0;i<text.length;i++){
+  const ch=text[i];
+  if(ch==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++}else if(!quoted&&field.length){field+=ch}else quoted=!quoted}
+  else if(ch===sep&&!quoted){row.push(field);field=''}
+  else if((ch==='\n'||ch==='\r')&&!quoted){
+   if(ch==='\r'&&text[i+1]==='\n')i++;
+   row.push(field);rows.push(row);row=[];field='';
+   if(rows.length===maxRows){clipped=i<text.length-1;break}
+  }else field+=ch;
+ }
+ if(!clipped&&(field.length||row.length)){row.push(field);rows.push(row)}
+ if(rows.some(r=>r.length>maxCols))clipped=true;
+ setContent(makeTable(rows.slice(0,maxRows),false));
+ if(clipped)setStatus('This file exceeds the '+maxRows+'-row or '+maxCols+'-column preview limit. PDF includes only the displayed portion.','warn');
+}
 function columnName(i){let name='';for(i++;i;i=Math.floor((i-1)/26))name=String.fromCharCode(65+(i-1)%26)+name;return name}
 function estimateWidths(rows,cols){const sample=rows.slice(0,120);return Array.from({length:cols},(_,c)=>Math.max(85,Math.min(250,Math.max(5,...sample.map(r=>String(r[c]??'').length))*7+25)))}
 function resizeColumn(table,c,w){columnWidths[c]=Math.max(65,Math.min(500,Math.round(w)));const cols=table.querySelectorAll('col');if(cols[c+(table.dataset.headers==='true'?1:0)])cols[c+(table.dataset.headers==='true'?1:0)].style.width=columnWidths[c]+'px';table.style.width=(columnWidths.reduce((x,y)=>x+y,0)+(table.dataset.headers==='true'?48:0))+'px'}
@@ -90,7 +106,45 @@ function makeTable(rows,showHeaders){const wrap=document.createElement('div');wr
 function applySheetWrap(root=content){const nowrap=$('sheet-wrap').value==='nowrap';for(const cell of root.querySelectorAll('.sheet td,.sheet th')){cell.style.whiteSpace=nowrap?'nowrap':'pre-wrap';cell.style.overflowWrap=nowrap?'normal':'anywhere'}}
 function renderSheet(name){sheetName=name;tabs.replaceChildren();for(const label of workbook.SheetNames){const button=document.createElement('button');button.type='button';button.textContent=label;button.className=label===name?'active':'';button.addEventListener('click',()=>{if(sheetName!==label)columnWidths=[];renderSheet(label);runSearch()});tabs.append(button)}const sheet=workbook.Sheets[name],range=window.XLSX.utils.decode_range(sheet['!ref']||'A1');const endRow=Math.min(range.e.r,range.s.r+maxRows-1),endCol=Math.min(range.e.c,range.s.c+maxCols-1);const rows=[];for(let r=range.s.r;r<=endRow;r++){const row=[];for(let c=range.s.c;c<=endCol;c++){const cell=sheet[XLSX.utils.encode_cell({r,c})];row.push(cell?String(cell.w??cell.v??''):'')}rows.push(row)}setContent(makeTable(rows,true));$('doctype').textContent='Spreadsheet · '+name;if(range.e.r>endRow||range.e.c>endCol)setStatus('Large worksheet: preview limited to '+maxRows+' rows and '+maxCols+' columns from the used range. PDF exports the visible sheet only.','warn');else setStatus('Viewing worksheet: '+name)}
 function runSearch(){const q=$('search').value.trim().toLocaleLowerCase();const scope=content;if(!current||current.ext==='pdf')return;for(const mark of [...scope.querySelectorAll('mark')])mark.replaceWith(document.createTextNode(mark.textContent));scope.normalize();if(!q)return;const walker=document.createTreeWalker(scope,NodeFilter.SHOW_TEXT);const nodes=[];while(walker.nextNode())if(walker.currentNode.parentElement&& !['SCRIPT','STYLE'].includes(walker.currentNode.parentElement.tagName))nodes.push(walker.currentNode);let found=0;for(const node of nodes){const text=node.nodeValue,lower=text.toLocaleLowerCase();if(!lower.includes(q))continue;const frag=document.createDocumentFragment();let from=0,at;while((at=lower.indexOf(q,from))>=0){frag.append(document.createTextNode(text.slice(from,at)));const mark=document.createElement('mark');mark.textContent=text.slice(at,at+q.length);frag.append(mark);from=at+q.length;found++;if(found>2000)break}frag.append(document.createTextNode(text.slice(from)));node.replaceWith(frag);if(found>2000)break}setStatus(found+' match'+(found===1?'':'es')+(found>2000?' (limit reached)':''));}
-async function openFile(file){clearView();if(!file)return;const ext=(file.name.split('.').pop()||'').toLowerCase();if(!supported.has(ext))return setStatus('Unsupported file format. Choose a file from the listed formats.','error');if(file.size>maxSize)return setStatus('File exceeds the 30 MB safety limit.','error');current={file,ext};workspace.classList.remove('hidden');$('filename').textContent=file.name;const meta=document.createElement('span');meta.className='meta';meta.textContent=(file.size/1024).toFixed(1)+' KB · '+ext.toUpperCase();$('filename').append(meta);$('doctype').textContent=ext.toUpperCase()+' reader';setStatus('Opening '+file.name+'…');try{const buffer=await file.arrayBuffer();if(ext==='docx'){if(typeof mammoth==='undefined'||typeof DOMPurify==='undefined')throw Error('Word reader or HTML sanitizer failed to load');const result=await mammoth.convertToHtml({arrayBuffer:buffer});const doc=document.createElement('div');doc.innerHTML=DOMPurify.sanitize(result.value,{USE_PROFILES:{html:true}});setContent(doc);if(result.messages.length)setStatus('Opened Word document. Some unsupported formatting may differ.','warn');else setStatus('Word document ready.')}else if(['xlsx','xls','ods'].includes(ext)){if(!window.XLSX)throw Error('Spreadsheet reader unavailable. Check internet connection.');workbook=XLSX.read(buffer,{type:'array',cellDates:true});if(!workbook.SheetNames.length)throw Error('No worksheets found');renderSheet(workbook.SheetNames[0])}else if(ext==='csv'||ext==='tsv'){renderDelimited(buffer,ext==='tsv'?'\t':',');$('doctype').textContent='Delimited table'}else if(ext==='pdf'){url=URL.createObjectURL(file);const iframe=document.createElement('iframe');iframe.className='pdfview';iframe.title='PDF preview';iframe.src=url;setContent(iframe);$('search').disabled=true;setStatus('PDF opened in the browser viewer. Export downloads the original PDF unchanged.')}else{displayText(decode(buffer),ext);setStatus('Document ready.')} $('sheet-layout').classList.toggle('hidden',!['xlsx','xls','ods','csv','tsv'].includes(ext)); }catch(err){console.error(err);content.replaceChildren();viewer.classList.add('hidden');$('pdf').disabled=true;setStatus('Unable to read file: '+(err.message||'Invalid or unsupported content'),'error')}}
+async function openFile(file){
+ clearView();if(!file)return;
+ const version=loadVersion;
+ const ext=(file.name.split('.').pop()||'').toLowerCase();
+ if(!supported.has(ext))return setStatus('Unsupported file format. Choose a file from the listed formats.','error');
+ if(file.size>maxSize)return setStatus('File exceeds the 30 MB safety limit.','error');
+ current={file,ext};workspace.classList.remove('hidden');
+ $('filename').textContent=file.name;
+ const meta=document.createElement('span');meta.className='meta';meta.textContent=(file.size/1024).toFixed(1)+' KB · '+ext.toUpperCase();$('filename').append(meta);
+ $('doctype').textContent=ext.toUpperCase()+' reader';setStatus('Opening '+file.name+'…');
+ try{
+  const buffer=await file.arrayBuffer();if(version!==loadVersion)return;
+  if(ext==='docx'){
+   if(typeof mammoth==='undefined'||typeof DOMPurify==='undefined')throw Error('Word reader or HTML sanitizer failed to load');
+   const result=await mammoth.convertToHtml({arrayBuffer:buffer});if(version!==loadVersion)return;
+   const doc=document.createElement('div');doc.innerHTML=DOMPurify.sanitize(result.value,{USE_PROFILES:{html:true}});
+   setContent(doc);setStatus(result.messages.length?'Word document opened. Some formatting may differ.':'Word document ready.',result.messages.length?'warn':'');
+  }else if(['xlsx','xls','ods'].includes(ext)){
+   if(!window.XLSX)throw Error('Spreadsheet reader unavailable. Check internet connection.');
+   workbook=XLSX.read(buffer,{type:'array',cellDates:true});
+   if(!workbook.SheetNames.length)throw Error('No worksheets found');
+   renderSheet(workbook.SheetNames[0]);
+  }else if(ext==='csv'||ext==='tsv'){
+   renderDelimited(buffer,ext==='tsv'?'\t':',');$('doctype').textContent='Delimited table';
+  }else if(ext==='pdf'){
+   url=URL.createObjectURL(file);const iframe=document.createElement('iframe');
+   iframe.className='pdfview';iframe.title='PDF preview';iframe.src=url;setContent(iframe);
+   $('search').disabled=true;setStatus('PDF opened in the browser viewer. Export downloads the original unchanged.');
+  }else{displayText(decode(buffer),ext);setStatus('Document ready.')}
+  $('sheet-layout').classList.toggle('hidden',!['xlsx','xls','ods','csv','tsv'].includes(ext));
+  $('pdf').disabled=false;$('preview-pdf').disabled=false;
+ }catch(err){
+  if(version!==loadVersion)return;
+  console.error(err);content.replaceChildren();viewer.classList.add('hidden');
+  current=null;workbook=null;activeSheetRows=null;
+  $('pdf').disabled=true;$('preview-pdf').disabled=true;
+  setStatus('Unable to read file: '+(err.message||'Invalid or unsupported content'),'error');
+ }
+}
 function closePdfPreview(){if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}previewPdf=null;$('pdf-preview-frame').removeAttribute('src');$('pdfPreview').classList.add('hidden')}
 function makePrintContent(){
  const root=document.createElement('div');root.style.cssText='background:white;color:#17212f;font-family:system-ui,sans-serif;font-size:'+$('font').value+'px;line-height:1.5;overflow:visible';
