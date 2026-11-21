@@ -36,6 +36,10 @@ button,.pick{display:inline-flex;align-items:center;justify-content:center;gap:5
 #pdfPreview .preview-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px}
 @media(max-width:720px),(pointer:coarse){#pdfPreview iframe{display:none!important}#mobile-pdf-pages{display:block}.mobile-preview-fallback{display:block}}.note{font-size:.78rem;color:#64748b;margin-top:12px}.hidden{display:none!important}
 .pdfview{width:100%;height:72vh;min-height:430px;border:0;background:#fff}
+.inline-pdf-pages{background:#e9edf2;padding:12px 8px;text-align:center;max-width:100%;overflow-x:hidden}
+.inline-pdf-pages canvas{display:block;max-width:100%;height:auto;margin:0 auto 14px;background:white;box-shadow:0 2px 12px #0002}
+.inline-pdf-pages .page-label{font-size:.78rem;color:#475569;margin:10px 0 5px}
+.inline-pdf-pages .page-loading{font-size:.85rem;color:#475569;padding:16px}
 mark{background:#ffe59c;color:inherit;border-radius:2px}
 footer{font-size:.79rem;color:#64748b;margin-top:20px;text-align:center}
 @media(max-width:620px){.shell{padding:16px 9px 35px}.paper{padding:15px 12px;max-height:68vh}.toolbar{padding:12px}.search{width:100%}.toolbar .filename{flex-basis:100%}.settings{gap:9px}.upload{padding:22px 10px}.pdfview{height:65vh}}
@@ -135,9 +139,41 @@ async function openFile(file){
   }else if(ext==='csv'||ext==='tsv'){
    renderDelimited(buffer,ext==='tsv'?'\t':',');$('doctype').textContent='Delimited table';
   }else if(ext==='pdf'){
-   url=URL.createObjectURL(file);const iframe=document.createElement('iframe');
-   iframe.className='pdfview';iframe.title='PDF preview';iframe.src=url;setContent(iframe);
-   $('search').disabled=true;setStatus('PDF opened in the browser viewer. Export downloads the original unchanged.');
+   url=URL.createObjectURL(file);
+   $('search').disabled=true;
+   if(window.matchMedia('(max-width:720px), (pointer:coarse)').matches){
+    const pages=document.createElement('div');pages.className='inline-pdf-pages';
+    const notice=document.createElement('p');notice.className='page-loading';notice.textContent='Loading PDF pages…';pages.append(notice);
+    setContent(pages);
+    if(typeof pdfjsLib==='undefined')throw Error('PDF renderer unavailable. Check your internet connection.');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const pdf=await pdfjsLib.getDocument({data:buffer}).promise;
+    if(version!==loadVersion){pdf.destroy();return}
+    pages.replaceChildren();
+    const limit=Math.min(pdf.numPages,40);
+    for(let n=1;n<=limit;n++){
+     if(version!==loadVersion){pdf.destroy();return}
+     const page=await pdf.getPage(n);
+     if(version!==loadVersion){pdf.destroy();return}
+     const viewport1=page.getViewport({scale:1});
+     const dpr=Math.min(window.devicePixelRatio||1,2);
+     const targetWidth=Math.max(200,Math.min(pages.clientWidth||window.innerWidth-50,850)-20);
+     const viewport=page.getViewport({scale:Math.min(2.5,targetWidth/viewport1.width)*dpr});
+     const title=document.createElement('div');title.className='page-label';title.textContent='Page '+n+' of '+pdf.numPages;
+     const canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+     canvas.style.width=Math.round(viewport.width/dpr)+'px';
+     pages.append(title,canvas);
+     const task=page.render({canvasContext:canvas.getContext('2d'),viewport});
+     try{await task.promise}catch(error){if(version!==loadVersion){pdf.destroy();return}throw error}
+     page.cleanup();
+    }
+    if(pdf.numPages>limit){const note=document.createElement('p');note.className='page-loading';note.textContent='Showing first '+limit+' of '+pdf.numPages+' pages. Download the original PDF to read the remaining pages.';pages.append(note)}
+    pdf.destroy();
+    setStatus('PDF ready for reading. '+pdf.numPages+' page(s). Export downloads the unchanged original.');
+   }else{
+    const iframe=document.createElement('iframe');iframe.className='pdfview';iframe.title='PDF document';iframe.src=url;setContent(iframe);
+    setStatus('PDF opened in the browser viewer. Export downloads the original unchanged.');
+   }
   }else{displayText(decode(buffer),ext);setStatus('Document ready.')}
   $('sheet-layout').classList.toggle('hidden',!['xlsx','xls','ods','csv','tsv'].includes(ext));
   $('pdf').disabled=false;$('preview-pdf').disabled=false;
